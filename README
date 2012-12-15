@@ -1,0 +1,2 @@
+WebsiteFinder scans random IPv4 addresses and looks for a header that signals
+a website exits for that address.
