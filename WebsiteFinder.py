@@ -15,7 +15,7 @@ class WebsiteFinder:
         startDatePipe.close
 
         self.fileName = "websites.txt"
-        self.file = open(self.fileName, "a")
+        self.file = open(self.fileName, "a", 1)
         self.file.write("\n" + self.startDate)
 
         self.timeLimitInMin = 0
