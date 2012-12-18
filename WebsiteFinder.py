@@ -3,7 +3,8 @@ import random
 import os
 import threading
 import sys
-
+import httplib
+import socket
 
 class WebsiteFinder:
 
@@ -55,19 +56,26 @@ class WebsiteFinder:
 
 
     def testIpForWebsite(self,ipAddress):
-        command = "HEAD -t 1 -C bleh:blah " + ipAddress
-        headPipe = os.popen(command, "r")
-        line = headPipe.readline()
-        headPipe.close()
+        #command = "HEAD -t 1 -C bleh:blah " + ipAddress
+        #headPipe = os.popen(command, "r")
+        #line = headPipe.readline()
+        #headPipe.close()
 
-        #print line
         self.ipsTested += 1
+        
+        try:
+	    conn = httplib.HTTPConnection(ipAddress, timeout=1)
+            conn.request("HEAD", "/")
+            res = conn.getresponse()
+            status = res.status
 
-        # if HTTP status code  == 2**
-        if line[0] == "2":
-            self.sitesFound += 1
-            return True
-        else:
+            if status == 200:
+		self.sitesFound += 1
+                return True
+            else:
+                return False
+
+        except(Exception):
             return False
 
     
@@ -83,7 +91,7 @@ class WebsiteFinder:
         while self.getRemainingTime() > 0 and self.sitesFound < self.sitesFoundLimit: 
             remainMin = int(self.getRemainingTime() / 60)
             remainSec = self.getRemainingTime() - (remainMin * 60)
-            sys.stdout.write("\rRemaining Time: %dm%.0fs    Ips Tested: %d    Websites Found: %d" % (remainMin, remainSec, self.ipsTested, self.sitesFound))
+            sys.stdout.write("\rRemaining Time: %dm%.0fs    Ips Tested: %d    Websites Found: %d   " % (remainMin, remainSec, self.ipsTested, self.sitesFound))
 	    sys.stdout.flush()
             time.sleep(1)
 
