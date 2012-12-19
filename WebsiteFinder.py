@@ -1,27 +1,22 @@
 import time
 import random
-import os
 import threading
 import sys
 import httplib
-import socket
 
 class WebsiteFinder:
 
-
     def __init__(self):
-        self.startTimeInSec = time.time()  
-        startDatePipe = os.popen("date", "r")
-        self.startDate = startDatePipe.read()
-        startDatePipe.close
+        self.startTimeInSec = time.time()
+        self.date = time.strftime("%a %b %d %H:%M:%S %Z %Y")
 
         self.fileName = "websites.txt"
         self.file = open(self.fileName, "a", 1)
-        self.file.write("\n" + self.startDate)
+        self.file.write("\n" + self.date + "\n")
 
         self.timeLimitInMin = 0
         self.sitesFound = 0
-        self.sitesFoundLimit = sys.maxint
+        self.sitesFoundLimit = 0
         self.ipsTested = 0
 
         self.numThreads = 0
@@ -32,7 +27,6 @@ class WebsiteFinder:
 	print "WebsiteFinder scans random ipv4 addresses and looks for a header"
     	print "that signals a website exits for the address"
     	print ""
-
         self.timeLimitInMin = float(input("Enter the max runtime(min): "))
         self.sitesFoundLimit = int(input(\
                                "Enter the max amount of websites to find: "))
@@ -40,14 +34,21 @@ class WebsiteFinder:
                           "Enter the amount of ip address checking threads: "))
         print ""
 
+
     def ipGenerator(self):
         num1 = random.randrange(1,254)
         num2 = random.randrange(1,254)
         num3 = random.randrange(1,254)
         num4 = random.randrange(1,254)
 
-        while num1 == 127:
+        while num1 == 127 or num1 == 10:
             num1 = random.randrange(1,254)
+
+        while ((num1 == 192 and num2 == 168) or 
+               (num1 == 172 and num2 in range(16,32))):
+            num1 = random.randrange(1,254)
+            num2 = random.randrange(1,254)
+
 
         ipAddress = str(num1) + "." + str(num2) + "." + \
                     str(num3) + "." + str(num4)
@@ -56,18 +57,13 @@ class WebsiteFinder:
 
 
     def testIpForWebsite(self,ipAddress):
-        #command = "HEAD -t 1 -C bleh:blah " + ipAddress
-        #headPipe = os.popen(command, "r")
-        #line = headPipe.readline()
-        #headPipe.close()
-
         self.ipsTested += 1
         
         try:
 	    conn = httplib.HTTPConnection(ipAddress, timeout=1)
             conn.request("HEAD", "/")
-            res = conn.getresponse()
-            status = res.status
+            response = conn.getresponse()
+            status = response.status
 
             if status == 200:
 		self.sitesFound += 1
