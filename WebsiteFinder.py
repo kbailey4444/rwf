@@ -20,12 +20,13 @@ class WebsiteFinder:
         self.fileName = self.settings["outputFilename"]
         self.file = open(self.fileName, "a", 1)
         self.file.write("\n" + self.date + "\n")
+        self.numThreads = self.settings["testingThreads"]
+        self.connTimeout = self.settings["connectionTimeout"]
         self.timeLimitInSec = self.getTimeLimitInSec()            
         self.sitesFound = 0
         self.sitesFoundLimit = self.settings["runtimeLimits"]["sitesFound"]
         self.adresTested = 0
         self.adresTestLimit = self.settings["runtimeLimits"]["addressesTested"]
-        self.numThreads = self.settings["testingThreads"]
 
 
     def getTimeLimitInSec(self):
@@ -44,7 +45,6 @@ class WebsiteFinder:
             if value != None:
                 timeLimitInSec += (value * valueSecs)
             valueSecs /= 60    
-        #timeLimitInSec = 
             
         return timeLimitInSec
     
@@ -97,7 +97,7 @@ class WebsiteFinder:
         self.adresTested += 1
         
         try:
-            conn = httplib.HTTPConnection(ipAddress, timeout=1)
+            conn = httplib.HTTPConnection(ipAddress, timeout=self.connTimeout)
             conn.request("HEAD", "/")
             response = conn.getresponse()
             status = response.status
