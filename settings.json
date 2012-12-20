@@ -1,0 +1,14 @@
+{
+     "outputFilename": "websites.txt",
+     "testingThreads": 30,
+     "connectionTimeout": 1,
+     "runtimeLimits": {
+         "time": {
+             "hour": null,
+             "minute": 15,
+             "second": null
+         },
+         "sitesFound": null,
+         "addressesTested": 1000
+     }
+}
