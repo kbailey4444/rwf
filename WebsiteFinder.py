@@ -11,15 +11,13 @@ class WebsiteFinder:
         self.startTimeInSec = time.time()
         self.date = time.strftime("%a %b %d %H:%M:%S %Z %Y")
         
-        try:
-            settingsFile = open("settings.json")
-            self.settings = json.load(settingsFile)
-        except(Exception):
-            self.settings = getDefaultSettings(self)
+        settingsFile = open("settings.json")
+        self.settings = json.load(settingsFile)
 
         self.fileName = self.settings["outputFilename"]
         self.file = open(self.fileName, "a", 1)
         self.file.write("\n" + self.date + "\n")
+        
         self.numThreads = self.settings["testingThreads"]
         self.connTimeout = self.settings["connectionTimeout"]
         self.timeLimitInSec = self.getTimeLimitInSec()            
@@ -41,6 +39,7 @@ class WebsiteFinder:
         
         timeLimitInSec = 0
         valueSecs = 60**2
+        
         for value in limitValues:
             if value != None:
                 timeLimitInSec += (value * valueSecs)
@@ -49,20 +48,18 @@ class WebsiteFinder:
         return timeLimitInSec
     
 
-    def getDefaultSettings(self):
-        time = {"hour": None, "minute": 15, "second": None}
-        runtimeLimits = {"time": time, "sitesFound": None, 
-                         "addressesTested": None}
-        default = {"outputFileName": "websites.txt", "testingThreads": 30,
-                   "connectionTimeout": 1, "runtimeLimits": runtimeLimits}
-        return default
-    
-
     def limited(self):
         runtimeLimits = self.settings["runtimeLimits"]
-         
-        timeLimited = all(runtimeLimits["time"].values()) != None
-        sitesFoundLimited =  runtimeLimits["sitesFound"] != None
+        
+        IsItNone = []
+        for value in runtimeLimits["time"].values():
+            if value == None:
+                IsItNone.append(True)
+            else:
+                IsItNone.append(False)
+        
+        timeLimited = any(IsItNone) != True 
+        sitesFoundLimited = runtimeLimits["sitesFound"] != None
         adresTestLimited = runtimeLimits["addressesTested"] != None
     
         if ((timeLimited and self.getRemainingTime() < 0) or
@@ -108,6 +105,8 @@ class WebsiteFinder:
             else:
                 return False
 
+        # returns false for all exceptions, should write exceptions to log file
+        # and should check if there is any internet connection
         except(Exception):
             return False
 
@@ -123,7 +122,9 @@ class WebsiteFinder:
     def updateTerminalDisplay(self):
         while not self.limited():
             totalSeconds = self.getRemainingTime()
-            hour, min, sec = self.secsToHrMinSec(totalSeconds)            
+            hour, min, sec = self.secsToHrMinSec(totalSeconds)
+            # when there is no time limit shows a negative time
+            # should display null when there is no time limit            
             sys.stdout.write("\rRemaining Time: %dh% dm% ds    Adres Tested: %d    Websites Found: %d   " % (hour, min, sec, self.adresTested, self.sitesFound))
      	    sys.stdout.flush()
             time.sleep(1)
