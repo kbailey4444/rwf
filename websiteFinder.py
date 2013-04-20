@@ -1,179 +1,207 @@
-import time
-import random
-import threading
-import sys
-import httplib
-import json
-
-class WebsiteFinder:
-
-    def __init__(self):
-        self.startTimeInSec = time.time()
-        self.date = time.strftime("%a %b %d %H:%M:%S %Z %Y")
-        
-        settingsFile = open("settings.json")
-        self.settings = json.load(settingsFile)
-
-        self.fileName = self.settings["outputFilename"]
-        self.file = open(self.fileName, "a", 1)
-        self.file.write("\n" + self.date + "\n")
-        
-        self.numThreads = self.settings["testingThreads"]
-        self.connTimeout = self.settings["connectionTimeout"]
-        self.timeLimitInSec = self.getTimeLimitInSec()            
-        self.sitesFound = 0
-        self.sitesFoundLimit = self.settings["runtimeLimits"]["sitesFound"]
-        self.adresTested = 0
-        self.adresTestLimit = self.settings["runtimeLimits"]["addressesTested"]
+from time import time
+from collections import deque
+from threading import RLock, Thread
+from random import Random
+from httplib import HTTPConnection
+from argparse import ArgumentParser
 
 
-    def getTimeLimitInSec(self):
-        timeLimits = self.settings["runtimeLimits"]["time"]
-        
-        # using list with timeLimits dict values embedded because for loop 
-        # requires ordered structure
-        limitValues = []
-        limitValues.append(timeLimits["hour"])
-        limitValues.append(timeLimits["minute"])
-        limitValues.append(timeLimits["second"])
-        
-        timeLimitInSec = 0
-        valueSecs = 60**2
-        
-        for value in limitValues:
-            if value != None:
-                timeLimitInSec += (value * valueSecs)
-            valueSecs /= 60    
-            
-        return timeLimitInSec
-    
+class RWF:
+
+    def __init__(self, num_threads=30, conn_timeout=1,
+                 sec_limit=None, min_limit=None, hour_limit=None,
+                 site_limit=None, addrs_limit=None):
+        self.num_threads = num_threads
+        self.conn_timeout = conn_timeout
+        self.start_time = None
+        self.limits = {}
+        self.limits["user"] = False
+        self.limits["time"] = {"sec": sec_limit, "min": min_limit,
+                               "hour": hour_limit}
+        self.limits["time"]["total"] = self.time_limit()
+        self.limits["site"] = site_limit
+        self.limits["addrs"] = addrs_limit
+        self.num_addrs_tested = 0
+        self.num_addrs_tested_lock = RLock()
+        self.num_sites_found = 0
+        self.num_sites_found_lock = RLock()
+        self.threads = []
+        self.sites = deque()
+
+    @classmethod
+    def from_cmdline(cls):
+        finder_parser = RWFArgParser()
+        args_dict = vars(finder_parser.parse_args())
+        return cls(**args_dict)
+
+    def time_limit(self):
+        total = 0
+        multiples = {"sec": 1, "min": 60, "hour": 60**2}
+        for key, value in self.limits["time"].iteritems():
+            if value is not None:
+                total += (value * multiples[key])
+        if total == 0:
+            return None
+        else:
+            return total
 
     def limited(self):
-        runtimeLimits = self.settings["runtimeLimits"]
-        
-        IsItNone = []
-        for value in runtimeLimits["time"].values():
-            if value == None:
-                IsItNone.append(True)
-            else:
-                IsItNone.append(False)
-        
-        timeLimited = any(IsItNone) != True 
-        sitesFoundLimited = runtimeLimits["sitesFound"] != None
-        adresTestLimited = runtimeLimits["addressesTested"] != None
-    
-        if ((timeLimited and self.getRemainingTime() < 0) or
-            (sitesFoundLimited and self.sitesFound > self.sitesFoundLimit) or
-            (adresTestLimited and self.adresTested > self.adresTestLimit)):
-                return True
+        time_limited = self.limits["time"]["total"] is not None
+        site_limited = self.limits["site"] is not None
+        addrs_limited = self.limits["addrs"] is not None
+        with self.num_addrs_tested_lock:
+            at_addrs_tested_lim = self.num_addrs_tested >= self.limits["addrs"]
+        if ((time_limited and self.remaining_time() <= 0) or
+            (site_limited and len(self.sites) >= self.site_limit) or
+            (addrs_limited and at_addrs_tested_lim) or (self.limits["user"])
+           ):
+            return True
         else:
             return False
 
+    def remaining_time(self):
+        current_time = time()
+        running_time = current_time - self.start_time
+        remaining_time = self.limits["time"]["total"] - running_time
+        return remaining_time
 
-    def ipGenerator(self):
-        num1 = random.randrange(1,254)
-        num2 = random.randrange(1,254)
-        num3 = random.randrange(1,254)
-        num4 = random.randrange(1,254)
+    def random_addrs(self):
+        addrs = []
+        total_range = xrange(0, 256)
+        # addresses not routed on the public internet
+        # http://en.wikipedia.org/wiki/Reserved_IP_addresses
+        # the key is the address element previously generated and
+        # the value is a range of values the next element can't be
+        # "all" refers to all element values in that location
+        options =\
+        {\
+         "all": [0,10,127] + range(224,256),
+	 100: {"all": xrange(64, 128)},
+         169: {"all": [254]},
+         172: {"all": xrange(16, 32)},
+         192: {"all": [168],
+               0    : {
+                       "all": [2],
+		       0    : xrange(0, 8)
+                      }
+	      },
+         198: {"all": [18, 20],
+               51   : [100]
+              },
+         203: {"all": [],
+               0    : [113]
+              }
+        }
+        self.use_options(options, addrs, total_range)
+        return "{}.{}.{}.{}".format(*addrs)
 
-        while num1 in [127, 10]:
-            num1 = random.randrange(1,254)
-         
-        while ((num1 == 192 and num2 == 168) or 
-               (num1 == 172 and num2 in range(16,32))):
-            num1 = random.randrange(1,254)
-            num2 = random.randrange(1,254)
-            
-        ipAddress = str(num1) + "." + str(num2) + "." + \
-                    str(num3) + "." + str(num4)
+    def use_options(self, location, addrs, total_range):
+        rand = Random()
+        if len(addrs) < 4:
+            # get list of the next part of the addrs that is not routed
+            # based on the location(addrs part number and previous addrses)
+            if type(location) == dict:
+                not_routed = location["all"]
+            elif type(location) == list:
+                not_routed = location
+            # perform set difference on the list and total_range to
+            # get an addrs element, then append
+            addrs.append(rand.choice(self.list_diff(total_range, not_routed)))
+            # if location is a dict, change location to the value for the
+            # key in the dict that equals the last element of addrs
+            if type(location) == dict:
+                if addrs[-1] in location.keys():
+                    location = location[addrs[-1]]
+            # if location is a list, there are no more nested dicts, so choose
+            # next addrs element from whole range
+            elif type(location) == list:
+                addrs.append(rand.choice(total_range))
+            # calls use_options again until there are four elements
+            self.use_options(location, addrs, total_range)
+        # four elements, addrs completed
+        else:
+            pass
 
-        return ipAddress
+    @staticmethod
+    def list_diff(minuend, subtrahend):
+        return list(set(minuend) - set(subtrahend))
 
-
-    def testAdresForWebsite(self,ipAddress):
-        self.adresTested += 1
-        
+    def is_site(self, addrs):
+        with self.num_addrs_tested_lock:
+            self.num_addrs_tested += 1
         try:
-            conn = httplib.HTTPConnection(ipAddress, timeout=self.connTimeout)
+            conn = HTTPConnection(addrs, timeout=self.conn_timeout)
             conn.request("HEAD", "/")
-            response = conn.getresponse()
-            status = response.status
-
-            if status == 200:
-                self.sitesFound += 1
+            status = conn.getresponse().status
+            if status in [200]:
                 return True
             else:
                 return False
-
-        # returns false for all exceptions, should write exceptions to log file
-        # and should check if there is any internet connection
-        except(Exception):
+        except:
             return False
 
-    
-    def findAndWriteWebsites(self):
+    def find_sites(self):
         while not self.limited():
-            ipAddress = self.ipGenerator()
-            
-            if self.testAdresForWebsite(ipAddress):
-                self.file.write(ipAddress + "\n")
+            addrs = self.random_addrs()
+            if self.is_site(addrs):
+                with self.num_sites_found_lock:
+                    self.num_sites_found += 1
+                self.sites.append(addrs)
+
+    def start_finding(self):
+        self.limits["user"] = False
+        self.start_time = time()
+        for i in range(self.num_threads):
+            thread = Thread(target=self.find_sites)
+            thread.start()
+            self.threads.append(thread)
+        #for thread in threads:
+        #    thread.join()
+
+    def stop_finding(self):
+        self.limits["user"] = True
 
 
-    def updateTerminalDisplay(self):
-        while not self.limited():
-            totalSeconds = self.getRemainingTime()
-            hour, min, sec = self.secsToHrMinSec(totalSeconds)
-            # when there is no time limit shows a negative time
-            # should display null when there is no time limit            
-            sys.stdout.write("\rRemaining Time: %dh% dm% ds    Adres Tested: %d    Websites Found: %d   " % (hour, min, sec, self.adresTested, self.sitesFound))
-     	    sys.stdout.flush()
-            time.sleep(1)
-    
-    
-    def secsToHrMinSec(self, seconds):
-        secs = seconds
-        minutes, seconds = divmod(secs, 60)
-        hours, minutes = divmod(minutes, 60)
-        return hours, minutes, seconds
-        
+class RWFArgParser(ArgumentParser):
 
-    def getRemainingTime(self):
-        currentTime = time.time()
-        runningTime = currentTime - self.startTimeInSec
-        remainingTime = self.timeLimitInSec - runningTime
+    def __init__(self):
+        super(RWFArgParser, self).__init__(description="Random Website Finder")
 
-        return remainingTime   
-
-
-    def run(self):
-        hour, min, sec = self.secsToHrMinSec(self.timeLimitInSec)
-        print "Time Limit: %dh %dm %ds" % (hour, min, sec)
-        
-        threads = []
-        displayThread = threading.Thread(target=self.updateTerminalDisplay)
-        displayThread.start()
-
-        for n in range(self.numThreads):
-	        thread = threading.Thread(target=self.findAndWriteWebsites)
-	        thread.start()
-	        threads.append(thread)
-
-        displayThread.join()
-
-        sys.stdout.write("\n")
-
-        for thread in threads:
-            thread.join()
-
-        self.file.close()
-
-        print ""
+    def parse_args(self):
+        super(RWFArgParser, self).add_argument("-th", "--num-threads",
+                                               type=int,
+                                               help=("set the number of website"
+                                                     "finding threads"))
+        super(RWFArgParser, self).add_argument("-ct", "--conn-timeout",
+                                               type=int,
+                                               help=("set the maximum amount of"
+                                                     "seconds to attempt to"
+                                                     "connect to addresses"))
+        super(RWFArgParser, self).add_argument("-sec", "--sec-limit", type=int,
+                                               help=("set an amount of seconds"
+                                                     "to add to the runtime"))
+        super(RWFArgParser, self).add_argument("-min", "--min-limit", type=int,
+                                               help=("set an amount of minutes"
+                                                    "to add to the runtime"))
+        super(RWFArgParser, self).add_argument("-hr", "--hour-limit", type=int,
+                     help="set an amount of hours to add to the runtime")
+        super(RWFArgParser, self).add_argument("-e", "--site-limit", type=int,
+                     help=("set an amount of sites, that when found"
+                           "will cause finding to stop"))
+        super(RWFArgParser, self).add_argument("-a", "--addrs-limit", type=int,
+                     help=("set an amount of addresses tested"
+                           "to limit the runtime"))
+        super(RWFArgParser, self).set_defaults(num_threads=30, conn_timeout=1)
+        return super(RWFArgParser, self).parse_args()
 
 
 def main():
-    siteFinder = WebsiteFinder()
-    siteFinder.run()
+    finder = RWF.from_cmdline()
+    finder.start_finding()
 
+    while not finder.limited():
+        if len(finder.sites) > 0:
+            print finder.sites.pop()
 
 if __name__ == "__main__":
     main()
