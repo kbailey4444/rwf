@@ -52,9 +52,9 @@ class RWF:
         with self.num_addrs_tested_lock:
             at_addrs_tested_lim = self.num_addrs_tested >= self.limits["addrs"]
         if ((time_limited and self.remaining_time() <= 0) or
-            (site_limited and len(self.sites) >= self.site_limit) or
-            (addrs_limited and at_addrs_tested_lim) or (self.limits["user"])
-           ):
+           (site_limited and len(self.sites) >= self.site_limit) or
+           (addrs_limited and at_addrs_tested_lim) or
+           (self.limits["user"])):
             return True
         else:
             return False
@@ -73,25 +73,21 @@ class RWF:
         # the key is the address element previously generated and
         # the value is a range of values the next element can't be
         # "all" refers to all element values in that location
-        options =\
-        {\
-         "all": [0,10,127] + range(224,256),
-	 100: {"all": xrange(64, 128)},
-         169: {"all": [254]},
-         172: {"all": xrange(16, 32)},
-         192: {"all": [168],
-               0    : {
-                       "all": [2],
-		       0    : xrange(0, 8)
-                      }
-	      },
-         198: {"all": [18, 20],
-               51   : [100]
-              },
-         203: {"all": [],
-               0    : [113]
-              }
-        }
+        options = {"all": [0, 10, 127] + range(224, 256),
+                   100: {"all": xrange(64, 128)},
+                   169: {"all": [254]},
+                   172: {"all": xrange(16, 32)},
+                   192: {"all": [168],
+                         0: {"all": [2],
+                             0: xrange(0, 8)}
+                         },
+                   198: {"all": [18, 20],
+                         51: [100]
+                         },
+                   203: {"all": [],
+                         0: [113]
+                         }
+                   }
         self.use_options(options, addrs, total_range)
         return "{}.{}.{}.{}".format(*addrs)
 
@@ -155,8 +151,6 @@ class RWF:
             thread = Thread(target=self.find_sites)
             thread.start()
             self.threads.append(thread)
-        #for thread in threads:
-        #    thread.join()
 
     def stop_finding(self):
         self.limits["user"] = True
@@ -168,29 +162,29 @@ class RWFArgParser(ArgumentParser):
         super(RWFArgParser, self).__init__(description="Random Website Finder")
 
     def parse_args(self):
-        super(RWFArgParser, self).add_argument("-th", "--num-threads",
-                                               type=int,
-                                               help=("set the number of website"
-                                                     "finding threads"))
-        super(RWFArgParser, self).add_argument("-ct", "--conn-timeout",
-                                               type=int,
-                                               help=("set the maximum amount of"
-                                                     "seconds to attempt to"
-                                                     "connect to addresses"))
-        super(RWFArgParser, self).add_argument("-sec", "--sec-limit", type=int,
-                                               help=("set an amount of seconds"
-                                                     "to add to the runtime"))
-        super(RWFArgParser, self).add_argument("-min", "--min-limit", type=int,
-                                               help=("set an amount of minutes"
-                                                    "to add to the runtime"))
-        super(RWFArgParser, self).add_argument("-hr", "--hour-limit", type=int,
-                     help="set an amount of hours to add to the runtime")
-        super(RWFArgParser, self).add_argument("-e", "--site-limit", type=int,
-                     help=("set an amount of sites, that when found"
-                           "will cause finding to stop"))
-        super(RWFArgParser, self).add_argument("-a", "--addrs-limit", type=int,
-                     help=("set an amount of addresses tested"
-                           "to limit the runtime"))
+        super(RWFArgParser, self).add_argument(
+            "-th", "--num-threads",
+            type=int, help="set the number of website finding threads")
+        super(RWFArgParser, self).add_argument(
+            "-ct", "--conn-timeout", type=int,
+            help=("set the maximum amount of seconds"
+                  "to attempt to connect to addresses"))
+        super(RWFArgParser, self).add_argument(
+            "-sec", "--sec-limit", type=int,
+            help="set an amount of seconds to add to the runtime")
+        super(RWFArgParser, self).add_argument(
+            "-min", "--min-limit", type=int,
+            help="set an amount of minutes to add to the runtime")
+        super(RWFArgParser, self).add_argument(
+            "-hr", "--hour-limit", type=int,
+            help="set an amount of hours to add to the runtime")
+        super(RWFArgParser, self).add_argument(
+            "-e", "--site-limit", type=int,
+            help=("set an amount of sites, that when"
+                  "found will cause finding to stop"))
+        super(RWFArgParser, self).add_argument(
+            "-a", "--addrs-limit", type=int,
+            help="set an amount of addresses tested to limit the runtime")
         super(RWFArgParser, self).set_defaults(num_threads=30, conn_timeout=1)
         return super(RWFArgParser, self).parse_args()
 
@@ -198,7 +192,6 @@ class RWFArgParser(ArgumentParser):
 def main():
     finder = RWF.from_cmdline()
     finder.start_finding()
-
     while not finder.limited():
         if len(finder.sites) > 0:
             print finder.sites.pop()
