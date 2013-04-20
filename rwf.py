@@ -52,7 +52,7 @@ class RWF:
         with self.num_addrs_tested_lock:
             at_addrs_tested_lim = self.num_addrs_tested >= self.limits["addrs"]
         if ((time_limited and self.remaining_time() <= 0) or
-           (site_limited and len(self.sites) >= self.site_limit) or
+           (site_limited and self.num_sites_found >= self.site_limit) or
            (addrs_limited and at_addrs_tested_lim) or
            (self.limits["user"])):
             return True
@@ -167,7 +167,7 @@ class RWFArgParser(ArgumentParser):
             type=int, help="set the number of website finding threads")
         super(RWFArgParser, self).add_argument(
             "-ct", "--conn-timeout", type=int,
-            help=("set the maximum amount of seconds"
+            help=("set the maximum amount of seconds "
                   "to attempt to connect to addresses"))
         super(RWFArgParser, self).add_argument(
             "-sec", "--sec-limit", type=int,
@@ -180,13 +180,18 @@ class RWFArgParser(ArgumentParser):
             help="set an amount of hours to add to the runtime")
         super(RWFArgParser, self).add_argument(
             "-e", "--site-limit", type=int,
-            help=("set an amount of sites, that when"
+            help=("set an amount of sites, that when "
                   "found will cause finding to stop"))
         super(RWFArgParser, self).add_argument(
             "-a", "--addrs-limit", type=int,
             help="set an amount of addresses tested to limit the runtime")
         super(RWFArgParser, self).set_defaults(num_threads=30, conn_timeout=1)
-        return super(RWFArgParser, self).parse_args()
+        args = super(RWFArgParser, self).parse_args()
+        if not (args.sec_limit or args.min_limit or args.hour_limit):
+            super(RWFArgParser, self).error(
+                ("At least one of --sec-limit, --min-limit, --hour-limit, \n"
+                 "--addrs-limit, or site-limit arguments must be given"))
+        return args
 
 
 def main():
