@@ -1,2 +1,3 @@
-WebsiteFinder scans random IPv4 addresses and looks for a header that signals
-a website exits for that address.
+rwf is a random website finder. It generates publicly routed ipv4 addresses
+and tests them with HEAD requests in order to see if they are functioning
+websites.
