@@ -123,11 +123,11 @@ class RWF:
         return list(set(minuend) - set(subtrahend))
 
     def is_site(self, addrs):
+        with self.num_addrs_tested_lock:
+            self.num_addrs_tested += 1
         try:
             conn = HTTPConnection(addrs, timeout=self.conn_timeout)
             conn.request("HEAD", "/")
-            with self.num_addrs_tested_lock:
-                self.num_addrs_tested += 1
             status = conn.getresponse().status
             if status in [200]:
                 return True
@@ -140,9 +140,9 @@ class RWF:
         while not self.limited():
             addrs = self.random_addrs()
             if self.is_site(addrs):
-                self.sites.append(addrs)
                 with self.num_sites_found_lock:
                     self.num_sites_found += 1
+                self.sites.append(addrs)
 
     def start_finding(self):
         self.limits["user"] = False
