@@ -28,6 +28,17 @@ class RWF:
         self.threads = []
         self.sites = deque()
 
+    def time_limit(self):
+        total = 0
+        multiples = {"sec": 1, "min": 60, "hour": 60**2}
+        for key, value in self.limits["time"].iteritems():
+            if value is not None:
+                total += (value * multiples[key])
+        if total == 0:
+            return None
+        else:
+            return total
+
     @classmethod
     def from_cmdline(cls):
         finder_parser = ArgumentParser(
@@ -64,17 +75,6 @@ class RWF:
                  "--addrs-limit, or site-limit arguments must be given"))
         args_dict = vars(finder_parser.parse_args())
         return cls(**args_dict)
-
-    def time_limit(self):
-        total = 0
-        multiples = {"sec": 1, "min": 60, "hour": 60**2}
-        for key, value in self.limits["time"].iteritems():
-            if value is not None:
-                total += (value * multiples[key])
-        if total == 0:
-            return None
-        else:
-            return total
 
     def start_finding(self):
         self.limits["user"] = False
