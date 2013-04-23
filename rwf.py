@@ -76,6 +76,22 @@ class RWF:
         else:
             return total
 
+    def start_finding(self):
+        self.limits["user"] = False
+        self.start_time = time()
+        for thread in range(self.num_threads):
+            thread = Thread(target=self.find_sites)
+            thread.start()
+            self.threads.append(thread)
+
+    def find_sites(self):
+        while not self.limited():
+            addrs = self.random_addrs()
+            if self.is_site(addrs):
+                with self.num_sites_found_lock:
+                    self.num_sites_found += 1
+                self.sites.append(addrs)
+
     def limited(self):
         time_limited = self.limits["time"]["total"] is not None
         site_limited = self.limits["site"] is not None
@@ -167,30 +183,14 @@ class RWF:
         except:
             return False
 
-    def find_sites(self):
-        while not self.limited():
-            addrs = self.random_addrs()
-            if self.is_site(addrs):
-                with self.num_sites_found_lock:
-                    self.num_sites_found += 1
-                self.sites.append(addrs)
-
-    def start_finding(self):
-        self.limits["user"] = False
-        self.start_time = time()
-        for thread in range(self.num_threads):
-            thread = Thread(target=self.find_sites)
-            thread.start()
-            self.threads.append(thread)
-
-    def stop_finding(self):
-        self.limits["user"] = True
-
     def finding(self):
         for thread in self.threads:
             if thread.isAlive():
                 return True
         return False
+
+    def stop_finding(self):
+        self.limits["user"] = True
 
 
 def main():
