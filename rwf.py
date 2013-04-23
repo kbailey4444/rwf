@@ -30,7 +30,37 @@ class RWF:
 
     @classmethod
     def from_cmdline(cls):
-        finder_parser = RWFArgParser()
+        finder_parser = ArgumentParser()
+        finder_parser.add_argument(
+            "-th", "--num-threads",
+            type=int, help="set the number of website finding threads")
+        finder_parser.add_argument(
+            "-ct", "--conn-timeout", type=int,
+            help=("set the maximum amount of seconds "
+                  "to attempt to connect to addresses"))
+        finder_parser.add_argument(
+            "-sec", "--sec-limit", type=int,
+            help="set an amount of seconds to add to the runtime")
+        finder_parser.add_argument(
+            "-min", "--min-limit", type=int,
+            help="set an amount of minutes to add to the runtime")
+        finder_parser.add_argument(
+            "-hr", "--hour-limit", type=int,
+            help="set an amount of hours to add to the runtime")
+        finder_parser.add_argument(
+            "-e", "--site-limit", type=int,
+            help=("set an amount of sites, that when "
+                  "found will cause finding to stop"))
+        finder_parser.add_argument(
+            "-a", "--addrs-limit", type=int,
+            help="set an amount of addresses tested to limit the runtime")
+        finder_parser.set_defaults(num_threads=30, conn_timeout=1)
+        args = finder_parser.parse_args()
+        if not (args.sec_limit or args.min_limit or args.hour_limit or
+                args.addrs_limit or args.site_limit):
+            finder_parser.error(
+                ("At least one of --sec-limit, --min-limit, --hour-limit, \n"
+                 "--addrs-limit, or site-limit arguments must be given"))
         args_dict = vars(finder_parser.parse_args())
         return cls(**args_dict)
 
@@ -160,45 +190,6 @@ class RWF:
             if thread.isAlive():
                 return True
         return False
-
-
-class RWFArgParser(ArgumentParser):
-
-    def __init__(self):
-        super(RWFArgParser, self).__init__(description="Random Website Finder")
-
-    def parse_args(self):
-        super(RWFArgParser, self).add_argument(
-            "-th", "--num-threads",
-            type=int, help="set the number of website finding threads")
-        super(RWFArgParser, self).add_argument(
-            "-ct", "--conn-timeout", type=int,
-            help=("set the maximum amount of seconds "
-                  "to attempt to connect to addresses"))
-        super(RWFArgParser, self).add_argument(
-            "-sec", "--sec-limit", type=int,
-            help="set an amount of seconds to add to the runtime")
-        super(RWFArgParser, self).add_argument(
-            "-min", "--min-limit", type=int,
-            help="set an amount of minutes to add to the runtime")
-        super(RWFArgParser, self).add_argument(
-            "-hr", "--hour-limit", type=int,
-            help="set an amount of hours to add to the runtime")
-        super(RWFArgParser, self).add_argument(
-            "-e", "--site-limit", type=int,
-            help=("set an amount of sites, that when "
-                  "found will cause finding to stop"))
-        super(RWFArgParser, self).add_argument(
-            "-a", "--addrs-limit", type=int,
-            help="set an amount of addresses tested to limit the runtime")
-        super(RWFArgParser, self).set_defaults(num_threads=30, conn_timeout=1)
-        args = super(RWFArgParser, self).parse_args()
-        if not (args.sec_limit or args.min_limit or args.hour_limit or
-                args.addrs_limit or args.site_limit):
-            super(RWFArgParser, self).error(
-                ("At least one of --sec-limit, --min-limit, --hour-limit, \n"
-                 "--addrs-limit, or site-limit arguments must be given"))
-        return args
 
 
 def main():
