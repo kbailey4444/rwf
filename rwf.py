@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from time import time
 from collections import deque
 from threading import RLock, Thread
