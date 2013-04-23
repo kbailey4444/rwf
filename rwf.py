@@ -30,7 +30,8 @@ class RWF:
 
     @classmethod
     def from_cmdline(cls):
-        finder_parser = ArgumentParser()
+        finder_parser = ArgumentParser(
+            description="rwf - A random website finder")
         finder_parser.add_argument(
             "-th", "--num-threads",
             type=int, help="set the number of website finding threads")
