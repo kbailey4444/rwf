@@ -1,20 +1,22 @@
 #!/usr/bin/env python
-
+#-*- coding: utf-8 -*-
 from time import time
 from collections import deque
 from threading import RLock, Thread
 from random import Random
-from httplib import HTTPConnection
+from httplib import HTTPConnection, responses
 from argparse import ArgumentParser
 
 
 class RWF:
 
     def __init__(self, num_threads=30, conn_timeout=1,
+                 good_statuses=responses.keys(), bad_statuses=[],
                  sec_limit=None, min_limit=None, hour_limit=None,
                  site_limit=None, addrs_limit=None):
         self.num_threads = num_threads
         self.conn_timeout = conn_timeout
+        self.status_codes = list_diff(good_statuses, bad_statuses)
         self.start_time = None
         self.limits = {}
         self.limits["user"] = False
@@ -32,7 +34,7 @@ class RWF:
 
     def time_limit(self):
         total = 0
-        multiples = {"sec": 1, "min": 60, "hour": 60**2}
+        multiples = {"sec": 1, "min": 60, "hour": 60 ** 2}
         for key, value in self.limits["time"].iteritems():
             if value is not None:
                 total += (value * multiples[key])
@@ -44,7 +46,7 @@ class RWF:
     @classmethod
     def from_cmdline(cls):
         finder_parser = ArgumentParser(
-            description="rwf - A random website finder")
+            description="rwf - a random website finder")
         finder_parser.add_argument(
             "-th", "--num-threads",
             type=int, help="set the number of website finding threads")
@@ -52,6 +54,12 @@ class RWF:
             "-ct", "--conn-timeout", type=int,
             help=("set the maximum amount of seconds "
                   "to attempt to connect to addresses"))
+        finder_parser.add_argument(
+            "-gs", "--good-statuses", type=int, nargs="+",
+            help="http status codes that will cause a site to be added")
+        finder_parser.add_argument(
+            "-bs", "--bad-statuses", type=int, nargs="+",
+            help="http status codes that will not cause a site to be added")
         finder_parser.add_argument(
             "-sec", "--sec-limit", type=int,
             help="set an amount of seconds to add to the runtime")
@@ -68,7 +76,9 @@ class RWF:
         finder_parser.add_argument(
             "-a", "--addrs-limit", type=int,
             help="set an amount of addresses tested to limit the runtime")
-        finder_parser.set_defaults(num_threads=30, conn_timeout=1)
+        finder_parser.set_defaults(
+            num_threads=30, conn_timeout=1,
+            good_statuses=responses.keys(), bad_statuses=[])
         args = finder_parser.parse_args()
         if not (args.sec_limit or args.min_limit or args.hour_limit or
                 args.addrs_limit or args.site_limit):
@@ -151,7 +161,7 @@ class RWF:
                 not_routed = location
             # perform set difference on the list and total_range to
             # get an addrs element, then append
-            addrs.append(rand.choice(self.list_diff(total_range, not_routed)))
+            addrs.append(rand.choice(list_diff(total_range, not_routed)))
             # if location is a dict, change location to the value for the
             # key in the dict that equals the last element of addrs
             if type(location) == dict:
@@ -167,10 +177,6 @@ class RWF:
         else:
             pass
 
-    @staticmethod
-    def list_diff(minuend, subtrahend):
-        return list(set(minuend) - set(subtrahend))
-
     def is_site(self, addrs):
         with self.num_addrs_tested_lock:
             self.num_addrs_tested += 1
@@ -178,7 +184,7 @@ class RWF:
             conn = HTTPConnection(addrs, timeout=self.conn_timeout)
             conn.request("HEAD", "/")
             status = conn.getresponse().status
-            if status in [200]:
+            if status in self.status_codes:
                 return True
             else:
                 return False
@@ -194,6 +200,12 @@ class RWF:
     def stop_finding(self):
         self.limits["user"] = True
 
+
+def list_diff(minuend, subtrahend):
+    return list(set(minuend) - set(subtrahend))
+
+def statuses_starting_with(num):
+    return filter(lambda status: str(status)[0] == str(num), responses.keys())
 
 def main():
     finder = RWF.from_cmdline()
