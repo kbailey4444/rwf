@@ -93,6 +93,7 @@ class RWF:
         self.start_time = time()
         for thread in range(self.num_threads):
             thread = Thread(target=self.find_sites)
+            thread.daemon=True
             thread.start()
             self.threads.append(thread)
 
