@@ -183,7 +183,7 @@ class RWF:
             self.num_addrs_tested += 1
         try:
             conn = HTTPConnection(addrs, timeout=self.conn_timeout)
-            conn.request("HEAD", "/")
+            conn.request("GET", "/")
             status = conn.getresponse().status
             if status in self.status_codes:
                 return True
